@@ -7,7 +7,7 @@ import threading
 
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 def normalize_filename(filename):
@@ -72,6 +72,10 @@ def draw_kanji(kanji_text, font_path, side_length=160, background_color=0, text_
 
             inv_filename += '.png'
             inv_path = os.path.join(kanji_dir, inv_filename)
+
+            inv_img = ImageOps.invert(semi_final_img)
+            if not os.path.exists(inv_path):
+                inv_img.save(inv_path, 'PNG')
 
     # return semi_final_img
 
@@ -144,7 +148,7 @@ KANJI_LIST = [
 font_dirs = ['../truetype_fonts', '../opentype_fonts']
 
 for idx, kanji_text in enumerate(KANJI_LIST):
-    print(f"{kanji_text}: {idx}/{len(KANJI_LIST)}")
+    start_time = time.time()
     for font_dir in font_dirs:
         font_files = os.listdir(font_dir)
         for font_file in font_files:
@@ -152,3 +156,5 @@ for idx, kanji_text in enumerate(KANJI_LIST):
             font_path = os.path.join(font_dir, font_file)
             draw_kanji(kanji_text, font_path, side_length=160,
                        save_dir='/media/shioko/SHIOKO/kanji_images')
+
+    print(f"{kanji_text}: {idx}/{len(KANJI_LIST)} takes {(time.time() - start_time):.2f}s")
