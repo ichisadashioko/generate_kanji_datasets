@@ -57,7 +57,9 @@
 
     - We can continuosly increase the `i` and `j` values by `10%` of the image size (width and height respectively) until the kanji bounding box hit the border.
 
-    - As you can can see with the sample above whose image size `(320, 320)` and `font_size` `300` (> 90%), translation may not mean much but not with smaller `font_size` like `60%` image size.
+    - As you can can see with the sample above whose image size `(320, 320)` and `font_size` `300` (> 90%), translation may not mean much but not with smaller `font_size` like `60%` image size. Below is a sample of translation with small `font_size` with each channel is a grayscale image.
+
+    ![more data sample](python/image_translation_sample.png)
 
 ## Note
 
