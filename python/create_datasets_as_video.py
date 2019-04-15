@@ -10,6 +10,36 @@ import matplotlib.pyplot as plt
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageChops
 
+
+class GrayscaleVideoWriter:
+    def __init__(self, video_writer, dsize=(160, 160)):
+        self.video_writer = video_writer
+        self.queue = []
+        self.dsize = dsize
+
+    def write(self, mat):
+        if len(self.queue) < 3:
+            self.queue.append(mat)
+        else:
+            frame = cv2.merge(tuple(self.queue))
+            self.video_writer.write(frame)
+            self.queue = []
+            self.queue.append(mat)
+
+    def cleanup(self):
+        if len(self.queue) == 0:
+            self.video_writer.release()
+            return
+        else:
+            missing_frame_count = 3 - len(self.queue)
+            for i in range(missing_frame_count):
+                self.queue.append(np.zeros(self.dsize, dtype=np.uint8))
+
+            frame = cv2.merge(tuple(self.queue))
+            self.video_writer.write(frame)
+            self.video_writer.release()
+
+
 KANJI_LIST = [
     '亜', '哀', '挨', '愛', '曖', '悪', '握', '圧', '扱', '宛', '嵐', '安', '案', '暗', '以', '衣', '位', '囲', '医', '依', '委', '威', '為', '畏', '胃', '尉', '異', '移', '萎', '偉', '椅', '彙', '意', '違', '維',
     '慰', '遺', '緯', '域', '育', '一', '壱', '逸', '茨', '芋', '引', '印', '因', '咽', '姻', '員', '院', '淫', '陰', '飲', '隠', '韻', '右', '宇', '羽', '雨', '唄', '鬱', '畝', '浦', '運', '雲', '永', '泳', '英',
@@ -181,8 +211,9 @@ def draw_kanji(kanji_text, font_path, video_writer, side_length=160, background_
                         base_img.shape[:2]
                     )
 
-                    rgb_img = cv2.cvtColor(final_img, cv2.COLOR_GRAY2BGR)
-                    video_writer.write(rgb_img)
+                    video_writer.write(final_img)
+                    # rgb_img = cv2.cvtColor(final_img, cv2.COLOR_GRAY2BGR)
+                    # video_writer.write(rgb_img)
 
 
 def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir='kanji_videos'):
@@ -206,6 +237,8 @@ def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir=
             (side_length, side_length)
         )
 
+        video_writer = GrayscaleVideoWriter(video_writer, dsize=(side_length, side_length))
+
         for font_dir in font_dirs:
             font_files = os.listdir(font_dir)
             for font_file in font_files:
@@ -220,22 +253,24 @@ def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir=
                         side_length=side_length
                     )
                 except:
-                    video_writer.release()
+                    video_writer.cleanup()
                     os.remove(video_path)
                     print(f"Safety exit at {kanji_text} - {idx}")
 
-
+                    return
 #                 break
 #             break
 
         print()
         print(
             f"{kanji_text}: {idx+1}/{len(KANJI_LIST)} takes {(time.time() - start_time):.2f}s")
-        video_writer.release()
+        video_writer.cleanup()
+        return
 
 
 generate_datasets_pipeline(
     KANJI_LIST,
     font_dirs,
-    save_dir='/media/shioko/SHIOKO/kanji_videos'
+    # save_dir='/media/shioko/SHIOKO/kanji_videos'
+    save_dir='kanji_videos'
 )
