@@ -221,10 +221,15 @@ def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir=
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
+    average_time = None
+
     for idx, kanji_text in enumerate(KANJI_LIST):
         start_time = time.time()
         video_name = f"{kanji_text}.mp4"
         video_path = os.path.join(save_dir, video_name)
+
+        if os.path.exists(video_path):
+            continue
 
         codec = 0x7634706d  # ubuntu mp4 codec
 
@@ -255,22 +260,31 @@ def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir=
                 except:
                     video_writer.cleanup()
                     os.remove(video_path)
+                    print()
                     print(f"Safety exit at {kanji_text} - {idx}")
 
                     return
 #                 break
 #             break
-
+        delta_time = (time.time() - start_time)
+        if average_time is None:
+            average_time = delta_time
+        else:
+            average_time = (average_time + delta_time) / 2
         print()
-        print(
-            f"{kanji_text}: {idx+1}/{len(KANJI_LIST)} takes {(time.time() - start_time):.2f}s")
+        print(f"{kanji_text}: {idx+1}/{len(KANJI_LIST)} takes {delta_time:.2f}s")
+        est_remaining = average_time * (len(KANJI_LIST) - idx)
+        hours = int(est_remaining / 3600)
+        minutes = int((est_remaining % 3600) / 60)
+        seconds = est_remaining % 60
+        print(f"AVG: {average_time:.2f}s, EST: {hours:02d}:{minutes:02d}:{seconds:.2f}")
         video_writer.cleanup()
-        return
+        # return
 
 
 generate_datasets_pipeline(
     KANJI_LIST,
     font_dirs,
-    # save_dir='/media/shioko/SHIOKO/kanji_videos'
-    save_dir='kanji_videos'
+    save_dir='/media/shioko/SHIOKO/kanji_videos'
+    # save_dir='kanji_videos'
 )
