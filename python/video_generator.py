@@ -106,7 +106,7 @@ KANJI_LIST = [
 font_dirs = ['../truetype_fonts', '../opentype_fonts']
 
 
-def draw_kanji(kanji_text, font_path, video_writer, side_length=160, background_color=0, text_color=255):
+def draw_kanji(kanji_text, font_path, video_writer, side_length=160, background_color=0, text_color=255, invert_color=False):
 
     print('.', end='')
 
@@ -165,6 +165,9 @@ def draw_kanji(kanji_text, font_path, video_writer, side_length=160, background_
             if np.sum(np_diff) < 255:
                 return
 
+            if invert_color:
+                semi_final_img = ImageOps.invert(semi_final_img)
+                
             base_img = np.array(semi_final_img)
 
             # Translate image method
@@ -277,14 +280,16 @@ def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir=
         hours = int(est_remaining / 3600)
         minutes = int((est_remaining % 3600) / 60)
         seconds = est_remaining % 60
-        print(f"AVG: {average_time:.2f}s, EST: {hours:02d}:{minutes:02d}:{seconds:.2f}")
+        print(f"AVG: {average_time:.2f}s, EST: {hours:02d}:{minutes:02d}:{seconds:02.2f}")
         video_writer.cleanup()
         # return
 
 
 generate_datasets_pipeline(
-    KANJI_LIST,
+    KANJI_LIST[2000:],
     font_dirs,
-    save_dir='/media/shioko/SHIOKO/kanji_videos'
-    # save_dir='kanji_videos'
+    # save_dir='/media/shioko/SHIOKO/kanji_videos'
+    save_dir='kanji_videos'
+    # save_dir="/media/shioko/6A30A41A30A3EB71/kanji_videos"
+    # save_dir="/media/shioko/Kuro\'s Drive/kanji_videos"
 )

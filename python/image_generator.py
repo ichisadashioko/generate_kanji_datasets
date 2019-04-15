@@ -3,23 +3,20 @@ from __future__ import print_function
 import os
 import re
 import time
-import threading
+
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageChops
 
 import numpy as np
+import cv2
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-
 
 def normalize_filename(filename):
     return re.sub(r"[\\\/\.\#\%\$\!\@\(\)\[\]]+", "_", filename)
 
 
-def draw_kanji(kanji_text, font_path, side_length=160, background_color=0, text_color=255, save_dir='kanji_images'):
+def draw_kanji(kanji_text, font_path, save_dir, side_length=160, background_color=0, text_color=255):
 
-    kanji_dir = os.path.join(save_dir, kanji_text)
-
-    if not os.path.exists(kanji_dir):
-        os.makedirs(kanji_dir)
+    print('.', end='')
 
     pad_side_length = int(side_length * 2)
     canvas = Image.new('L', (pad_side_length, pad_side_length), color=0)
@@ -30,16 +27,20 @@ def draw_kanji(kanji_text, font_path, side_length=160, background_color=0, text_
         font = ImageFont.truetype(font_path, font_size)
         pad_offset = (pad_side_length - font_size) / 2
         ctx.text((pad_offset, pad_offset), kanji_text,
-                fill=text_color, font=font)
+                 fill=text_color, font=font)
 
         for rotate_degree in range(-10, 15, 5):
             center_x = canvas.width / 2
             center_y = canvas.height / 2
-            rotate_img = canvas.rotate(rotate_degree, center=(center_x, center_y))
+            rotate_img = canvas.rotate(
+                rotate_degree, center=(center_x, center_y))
 
             np_img = np.array(rotate_img)
             kanji_idx = np_img.nonzero()
 
+            # If the font does not support this character,
+            # it will draw either none or a square
+            # The try block below is to deal with blank image
             try:
                 max_x = kanji_idx[1][np.argmax(kanji_idx[1])]
                 min_x = kanji_idx[1][np.argmin(kanji_idx[1])]
@@ -47,37 +48,149 @@ def draw_kanji(kanji_text, font_path, side_length=160, background_color=0, text_
                 max_y = kanji_idx[0][np.argmax(kanji_idx[0])]
                 min_y = kanji_idx[0][np.argmin(kanji_idx[0])]
             except:
-                # print(f"Error at kanji={kanji_text}, font_path={font_path}")
-                return
+                # print(f"Error at kanji={kanji_text}, font_path={font_path}, font_size={font_size}, rotate_degree={rotate_degree}")
+                return None
 
             actual_width = max_x - min_x
             actual_height = max_y - min_y
 
-            offset_x = min_x - ((side_length - actual_width) / 2)
-            offset_y = min_y - ((side_length - actual_height) / 2)
+            x_padding = (side_length - actual_width) / 2
+            y_padding = (side_length - actual_height) / 2
 
-            semi_final_img = rotate_img.crop(
-                (offset_x, offset_y, offset_x + side_length, offset_y + side_length))
+            offset_x = min_x - x_padding
+            offset_y = min_y - y_padding
 
-            filename = f"{kanji_text}_{font_size}_{rotate_degree}_{font_path}"
-            filename = normalize_filename(filename)
+            semi_final_img = rotate_img.crop((
+                offset_x, offset_y, offset_x + side_length,
+                offset_y + side_length
+            ))
 
-            inv_filename = filename + '_inv'
+            invalid_sample = Image.open('invalid_image.png')
 
-            filename += '.png'
+            diff = ImageChops.difference(invalid_sample, semi_final_img)
+            np_diff = np.array(diff)
 
-            img_path = os.path.join(kanji_dir, filename)
-            if not os.path.exists(img_path):
-                semi_final_img.save(img_path, 'PNG')
+            if np.sum(np_diff) < 255:
+                return
 
-            inv_filename += '.png'
-            inv_path = os.path.join(kanji_dir, inv_filename)
+            base_img = np.array(semi_final_img)
 
-            inv_img = ImageOps.invert(semi_final_img)
-            if not os.path.exists(inv_path):
-                inv_img.save(inv_path, 'PNG')
+            # Translate image method
+            x_transform_vectors = []
+            y_transform_vectors = []
 
-    # return semi_final_img
+            stride = side_length / 10
+            x_transform_vectors.append(0)
+            idx = 1
+            while True:
+                x_vector = stride * idx
+
+                if (x_padding - x_vector) < 0:
+                    break
+
+                x_transform_vectors.append(x_vector)
+                x_transform_vectors.append(-x_vector)
+
+                idx += 1
+
+            y_transform_vectors.append(0)
+            idx = 1
+            while True:
+                y_vector = stride * idx
+
+                if (y_padding - y_vector) < 0:
+                    break
+
+                y_transform_vectors.append(y_vector)
+                y_transform_vectors.append(-y_vector)
+
+                idx += 1
+
+            for x_vector in x_transform_vectors:
+                for y_vector in y_transform_vectors:
+                    transform_matrix = np.float32([
+                        [1, 0, x_vector],
+                        [0, 1, y_vector]
+                    ])
+
+                    final_img = cv2.warpAffine(
+                        base_img,
+                        transform_matrix,
+                        base_img.shape[:2]
+                    )
+                    # convert to pillow image
+                    final_img = Image.fromarray(final_img, 'L')
+
+                    filename = f"{kanji_text}_size_{font_size}_rotate_{rotate_degree}_x_{x_vector}_y_{y_vector}_{font_path}"
+                    filename = normalize_filename(filename)
+
+                    inv_filename = 'inv_' + filename
+
+                    filename += '.png'
+
+                    img_path = os.path.join(save_dir, filename)
+                    if not os.path.exists(img_path):
+                        final_img.save(img_path, 'PNG')
+
+                    inv_filename += '.png'
+                    inv_path = os.path.join(save_dir, inv_filename)
+
+                    inv_img = ImageOps.invert(final_img)
+                    if not os.path.exists(inv_path):
+                        inv_img.save(inv_path, 'PNG')
+
+
+def generate_datasets_pipeline(KANJI_LIST, font_dirs, side_length=160, save_dir='kanji_images'):
+    avg_time = None
+
+    for idx, kanji_text in enumerate(KANJI_LIST):
+        start_time = time.time()
+
+        kanji_dir = os.path.join(save_dir, kanji_text)
+
+        if os.path.exists(kanji_dir):
+            continue
+        else:
+            os.makedirs(kanji_dir)
+
+        for font_dir in font_dirs:
+            font_files = os.listdir(font_dir)
+            for font_file in font_files:
+                font_path = os.path.join(font_dir, font_file)
+
+                try:
+                    draw_kanji(
+                        kanji_text,
+                        font_path,
+                        kanji_dir,
+                        side_length=side_length
+                    )
+                except:
+                    print()
+                    print("I am clean up your mess. Please do not press Ctrl + C!")
+                    empty_dir = os.path.join(save_dir, 'empty_dir')
+                    os.system(f'mkdir {empty_dir}')
+                    os.system(f"rsync --delete {empty_dir} {kanji_dir}")
+                    os.remove(empty_dir)
+                    os.remove(kanji_dir)
+                    print(f"Safety exit at {kanji_text} - {idx}")
+
+                    return
+#                 break
+#             break
+        delta_time = (time.time() - start_time)
+        if avg_time is None:
+            avg_time = delta_time
+        else:
+            avg_time = (avg_time + delta_time) / 2
+        print()
+        print(f"{kanji_text}: {idx+1}/{len(KANJI_LIST)} takes {delta_time:.2f}s")
+        est_remaining = avg_time * (len(KANJI_LIST) - idx - 1)
+        hh = int(est_remaining / 3600)
+        mm = int((est_remaining % 3600) / 60)
+        ss = est_remaining % 60
+        print(f"AVG: {avg_time:.2f}s, EST: {hh:02d}:{mm:02d}:{ss:02.2f}")
+        # return
 
 
 KANJI_LIST = [
@@ -144,17 +257,13 @@ KANJI_LIST = [
     '列', '劣', '烈', '裂', '恋', '連', '廉', '練', '錬', '呂', '炉', '賂', '路', '露', '老', '労', '弄', '郎', '朗', '浪', '廊', '楼', '漏', '籠', '六', '録', '麓', '論', '和', '話', '賄', '脇', '惑', '枠', '湾',
 ]
 
-
 font_dirs = ['../truetype_fonts', '../opentype_fonts']
 
-for idx, kanji_text in enumerate(KANJI_LIST):
-    start_time = time.time()
-    for font_dir in font_dirs:
-        font_files = os.listdir(font_dir)
-        for font_file in font_files:
-
-            font_path = os.path.join(font_dir, font_file)
-            draw_kanji(kanji_text, font_path, side_length=160,
-                       save_dir='/media/shioko/SHIOKO/kanji_images')
-
-    print(f"{kanji_text}: {idx}/{len(KANJI_LIST)} takes {(time.time() - start_time):.2f}s")
+generate_datasets_pipeline(
+    KANJI_LIST[400:600],
+    font_dirs,
+    # save_dir='/media/shioko/FC28F55728F510FE/kanji_images' # drive E
+    # save_dir='/media/shioko/SHIOKO/kanji_images' # 
+    save_dir="/media/shioko/Kuro\'s Drive/kanji_images" #
+    # save_dir="/media/shioko/6A30A41A30A3EB71/kanji_images" # drive C 
+)
