@@ -1,5 +1,27 @@
-# Create kanji characters datasets with Javascript Canvas (nodeJS) and OpenCV (Python)
+# Create kanji characters datasets with Javascript Canvas (nodeJS) or PIL (Python)
 
+- Javascript Canvas:
+
+    - Pros:
+
+        - Can easily center image without much effort
+
+    - Cons:
+
+        - Can only save as 4 or 3 channels image (larger size)
+        - Asynchronous calls put too much stress on the system (it will freeze the computer if you can't shut it down)
+
+- Python PIL
+
+    - Pros:
+
+        - Have for image processing operations
+        - Can save image as grayscale image (single channel)
+
+    - Cons
+
+        - Python linear natural makes the process takes very long time to complete.
+        
 ## Instructions (Python)
 
 0. Collect fonts (`n` fonts)
