@@ -88,8 +88,7 @@ def draw_kanji(kanji_text, font_dicts, save_dir, side_length=160, background_col
                 max_y = kanji_idx[0][np.argmax(kanji_idx[0])]
                 min_y = kanji_idx[0][np.argmin(kanji_idx[0])]
             except:
-                # print(f"Error at kanji={kanji_text}, font_path={font_path}, font_size={font_size}, rotate_degree={rotate_degree}")
-                return None
+                break
 
             actual_width = max_x - min_x
             actual_height = max_y - min_y
